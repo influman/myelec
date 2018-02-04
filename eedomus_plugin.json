@@ -1,0 +1,449 @@
+{
+	"plugin_id": "myelec",
+	"name_fr": "Conso. électrique Tarif HP-HC",
+	"icon": "myelec.png",
+	"version": "2.00",
+	"creation_date": "2017-10-30",
+	"modification_date": "2018-01-20",
+	"author": "Influman",
+	"description_fr": "Suivi de la <b>consommation électrique</b>,<br>depuis un état de consommation cumulé ou instantané.<br>Plug-In pour une <b>Tarification Heures Pleines - Heures Creuses</b> (HP-HC).",
+	"description_en": "",
+	"description_es": "",
+	"description_it": "",
+	"description_de": "",
+	"forum_link": "http://forum.eedomus.com/viewtopic.php?f=50&t=6065",
+	"parameters":
+  [
+		{
+			"parameter": "NAME", 
+			"description": "Nom du périphérique mesuré",
+			"xtype": "textfield",
+			"default_value": "Conso Appareil",
+			"field": "width:200, allowBlank:false"
+		},
+		{
+    		"parameter": "APII", 
+			"description": "Périphérique Consommation Instantanée (en w)",
+    		"xtype": "combo",
+			"field": "store : getCombo('/json/list_all.php?value_type=float&filter_unit=W,kW'), displayField: 'label', valueField: 'id', typeAhead: true, forceSelection: true, triggerAction: 'all', selectOnFocus: true, editable: false, shadow:true, mode: 'local', width: 250, listWidth: 300, allowBlank: true"
+		},
+		{
+    		"parameter": "APIC", 
+			"description": "...ou Périphérique Consommation Cumulée (en wH)",
+    		"xtype": "combo",
+			"field": "store : getCombo('/json/list_all.php?value_type=float&filter_unit=Wh,kWh'), displayField: 'label', valueField: 'id', typeAhead: true, forceSelection: true, triggerAction: 'all', selectOnFocus: true, editable: false, shadow:true, mode: 'local', width: 250, listWidth: 300, allowBlank: true"
+		},
+		{
+			"parameter": "DELTA", 
+			"description": "Si cumulé, écart avec le compteur réel (hp-hc)",
+			"xtype": "textfield",
+			"default_value": "0-0",
+			"field": "width:150, allowBlank:false"
+		},
+		{
+			"parameter": "ECO", 
+			"description": "Etat fournissant la valeur HP ou HC",
+			"xtype": "combo",
+			"field": "store : getCombo('/json/list_all.php?value_type=list'), displayField: 'label', valueField: 'id', typeAhead: true, forceSelection: true, triggerAction: 'all', selectOnFocus: true, editable: false, shadow:true, mode: 'local', width: 250, listWidth: 300, allowBlank: true"
+		},
+		{
+			"parameter": "HP1", 
+			"description": "Sinon saisir, heure début HP 1er créneau (ex. 05:00)",
+			"xtype": "textfield",
+			"default_value": "05:00",
+			"field": "width:150, allowBlank:false"
+		},
+		{
+			"parameter": "HC1", 
+			"description": "...heure début HC 1er créneau (ex. 21:00)",
+			"xtype": "textfield",
+			"default_value": "14:30",
+			"field": "width:150, allowBlank:false"
+		},
+		{
+			"parameter": "HP2", 
+			"description": "...heure début HP 2nd créneau (99:99 si non applicable)",
+			"xtype": "textfield",
+			"default_value": "16:30",
+			"field": "width:150, allowBlank:false"
+		},
+		{
+			"parameter": "HC2", 
+			"description": "...heure début HC 2nd créneau (99:99 si non applicable)",
+			"xtype": "textfield",
+			"default_value": "23:00",
+			"field": "width:150, allowBlank:false"
+		}
+  ],
+	"scripts":
+	[
+		{
+			"name": "myelec.php"
+		}
+	],
+	"devices":
+  [
+		{
+			"device_id": "suiconso",
+			"module_id": "51",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - Statut",
+			"icon": "myelec.png",
+			"utilisation_id": "35",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "string",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=updateconso",
+				"RAW_XPATH": "/MYELEC/STATUT",
+				"POLLING": "1"
+			}
+		},
+		{
+			"device_id": "compteur",
+			"parent_id": "suiconso",
+			"module_id": "51",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - Compteur",
+			"icon": "myelec.png",
+			"utilisation_id": "35",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "string",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=read&value=cpt_delta_hphc",
+				"RAW_XPATH": "concat('HP ', /MYELEC/CPT_DELTA_HP, ' - HC ',/MYELEC/CPT_DELTA_HC)",
+				"POLLING": "1"
+			}
+		},
+		{
+			"device_id": "abo",
+			"parent_id": "suiconso",
+			"module_id": "41",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - Abonnement",
+			"icon": "teleinfo_money.png",
+			"utilisation_id": "43",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "list",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=updatetarif&type=abo&value=poll",
+				"RAW_XPATH": "/MYELEC/ABO",
+				"POLLING": "1"
+			},
+			"values":
+			[
+				{ "value": "6kVA  HP-HC", "description": "6kVA HP-HC 114.42 eur", "icon": "teleinfo_money.png", "http_url": "http://localhost/script/?exec=myelec.php", "http_type": "GET",  "http_params": "&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=updatetarif&type=abo&value=[RAW_VALUE]" },
+				{ "value": "9kVA  HP-HC", "description": "9kVA HP-HC 140.65 eur", "icon": "teleinfo_money.png", "http_url": "http://localhost/script/?exec=myelec.php", "http_type": "GET",  "http_params": "&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=updatetarif&type=abo&value=[RAW_VALUE]" },
+				{ "value": "12kVA HP-HC", "description": "12kVA HP-HC 164.74 eur", "icon": "teleinfo_money.png", "http_url": "http://localhost/script/?exec=myelec.php", "http_type": "GET",  "http_params": "&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=updatetarif&type=abo&value=[RAW_VALUE]" },
+				{ "value": "9999", "description": "RAZ Attention", "icon": "teleinfo_money.png", "http_url": "http://localhost/script/?exec=myelec.php", "http_type": "GET",  "http_params": "&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=raz" }
+			]
+		 },
+		{
+			"device_id": "tarif",
+			"parent_id" : "suiconso",
+			"module_id": "51",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - Tarifs",
+			"icon": "teleinfo_money.png",
+			"utilisation_id": "35",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "list",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=updatetarif&type=tarif",
+				"RAW_XPATH": "/MYELEC/TARIF",
+				"POLLING": "1"
+			},
+      "values":
+			[
+				{ "value": "6kVA  HC", "description": "0.1252", "icon": "teleinfo_money.png" },
+				{ "value": "6kVA  HP", "description": "0.1593", "icon": "teleinfo_money.png" },
+				{ "value": "9kVA  HC", "description": "0.1252", "icon": "teleinfo_money.png" },
+				{ "value": "9kVA  HP", "description": "0.1593", "icon": "teleinfo_money.png" },
+				{ "value": "12kVA HC", "description": "0.1252", "icon": "teleinfo_money.png" },
+				{ "value": "12kVA HP", "description": "0.1593", "icon": "teleinfo_money.png" }
+			]
+		},
+		{
+			"device_id": "hphc",
+			"parent_id": "suiconso",
+			"module_id": "51",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - HP HC",
+			"icon": "teleinfo_money.png",
+			"utilisation_id": "35",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "list",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=updatetarif&type=hphc&eco=plugin.parameters.ECO",
+				"RAW_XPATH": "/MYELEC/HPHC",
+				"POLLING": "1"
+			},
+      "values":
+			[
+				{ "value": "HP1", "description": "plugin.parameters.HP1 (HP)", "icon": "teleinfo_money.png" },
+				{ "value": "HC1", "description": "plugin.parameters.HC1 (HC)", "icon": "teleinfo_money.png" },
+				{ "value": "HP2", "description": "plugin.parameters.HP2 (HP)", "icon": "teleinfo_money.png" },
+				{ "value": "HC2", "description": "plugin.parameters.HC2 (HC)", "icon": "teleinfo_money.png" }
+			]
+		},
+		{
+			"device_id": "jourhp",
+			"parent_id": "suiconso",
+			"module_id": "51",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - HP Jour",
+			"icon": "myelecjourhp.png",
+			"utilisation_id": "35",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "string",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=read&value=jour_hp",
+				"RAW_XPATH": "concat(/MYELEC/JOUR_HP, 'kwh (', /MYELEC/JOUR_HPC, 'eur)')",
+				"POLLING": "1"
+			}
+		},
+		{
+			"device_id": "jourhc",
+			"parent_id": "suiconso",
+			"module_id": "51",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - HC Jour",
+			"icon": "myelecjourhc.png",
+			"utilisation_id": "35",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "string",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=read&value=jour_hc",
+				"RAW_XPATH": "concat(/MYELEC/JOUR_HC, 'kwh (', /MYELEC/JOUR_HCC, 'eur)')",
+				"POLLING": "1"
+			}
+		},
+		{
+			"device_id": "moishp",
+			"parent_id": "suiconso",
+			"module_id": "51",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - HP Mois",
+			"icon": "myelecmoishp.png",
+			"utilisation_id": "35",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "string",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=read&value=mois_hp",
+				"RAW_XPATH": "concat(/MYELEC/MOIS_HP, 'kwh (', /MYELEC/MOIS_HPC, 'eur)')",
+				"POLLING": "1"
+			}
+		},
+		{
+			"device_id": "moishc",
+			"parent_id": "suiconso",
+			"module_id": "51",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - HC Mois",
+			"icon": "myelecmoishc.png",
+			"utilisation_id": "35",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "string",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=read&value=mois_hc",
+				"RAW_XPATH": "concat(/MYELEC/MOIS_HC, 'kwh (', /MYELEC/MOIS_HCC, 'eur)')",
+				"POLLING": "1"
+			}
+		},
+		{
+			"device_id": "anneehp",
+			"parent_id": "suiconso",
+			"module_id": "51",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - HP Annee",
+			"icon": "myelecanhp.png",
+			"utilisation_id": "35",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "string",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=read&value=annee_hp",
+				"RAW_XPATH": "concat(/MYELEC/ANNEE_HP, 'kwh (', /MYELEC/ANNEE_HPC, 'eur)')",
+				"POLLING": "1"
+			}
+		},
+		{
+			"device_id": "anneehc",
+			"parent_id": "suiconso",
+			"module_id": "51",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - HC Annee",
+			"icon": "myelecanhc.png",
+			"utilisation_id": "35",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "string",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=read&value=annee_hc",
+				"RAW_XPATH": "concat(/MYELEC/ANNEE_HC, 'kwh (', /MYELEC/ANNEE_HCC, 'eur)')",
+				"POLLING": "1"
+			}
+		},
+		{
+			"device_id": "anprechp",
+			"parent_id": "suiconso",
+			"module_id": "51",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - HP A-1",
+			"icon": "myelecanprechp.png",
+			"utilisation_id": "35",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "string",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=read&value=annee_prec_hp",
+				"RAW_XPATH": "concat(/MYELEC/ANNEE_PREC_HP, 'kwh (', /MYELEC/ANNEE_PREC_HPC, 'eur)')",
+				"POLLING": "1"
+			}
+		},
+		{
+			"device_id": "anprechc",
+			"parent_id": "suiconso",
+			"module_id": "51",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - HC A-1",
+			"icon": "myelecanprechc.png",
+			"utilisation_id": "35",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "string",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=read&value=annee_prec_hc",
+				"RAW_XPATH": "concat(/MYELEC/ANNEE_PREC_HC, 'kwh (', /MYELEC/ANNEE_PREC_HCC, 'eur)')",
+				"POLLING": "1"
+			}
+		},
+		{
+			"device_id": "moisprechp",
+			"parent_id": "suiconso",
+			"module_id": "51",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - HP M-1",
+			"icon": "myelecmoisprechp.png",
+			"utilisation_id": "35",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "string",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=read&value=mois_prec_hp",
+				"RAW_XPATH": "concat(/MYELEC/MOIS_PREC_HP, 'kwh (', /MYELEC/MOIS_PREC_HPC, 'eur)')",
+				"POLLING": "1"
+			}
+		},
+		{
+			"device_id": "moisprechc",
+			"parent_id": "suiconso",
+			"module_id": "51",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - HC M-1",
+			"icon": "myelecmoisprechc.png",
+			"utilisation_id": "35",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "string",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=read&value=mois_prec_hc",
+				"RAW_XPATH": "concat(/MYELEC/MOIS_PREC_HC, 'kwh (', /MYELEC/MOIS_PREC_HCC, 'eur)')",
+				"POLLING": "1"
+			}
+		},
+		{
+			"device_id": "jprechp",
+			"parent_id": "suiconso",
+			"module_id": "51",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - HP J-1",
+			"icon": "myelecjourprechp.png",
+			"utilisation_id": "35",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "string",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=read&value=jour_prec_hp",
+				"RAW_XPATH": "concat(/MYELEC/JOUR_PREC_HP, 'kwh (', /MYELEC/JOUR_PREC_HPC, 'eur)')",
+				"POLLING": "1"
+			}
+		},
+		{
+			"device_id": "jprechc",
+			"parent_id": "suiconso",
+			"module_id": "51",
+			"type": "http",
+			"name_fr": "plugin.parameters.NAME - HC J-1",
+			"icon": "myelecjourprechc.png",
+			"utilisation_id": "35",
+			"parameters":
+			{
+				"VAR1": "plugin.parameters.APII",
+				"VAR2": "plugin.parameters.APIC",
+      			"VAR3": "plugin.parameters.DELTA",
+				"value_type": "string",
+				"ignore_errors": 3,
+				"RAW_URL": "http://localhost/script/?exec=myelec.php&apii=[VAR1]&apic=[VAR2]&delta=[VAR3]&action=read&value=jour_prec_hc",
+				"RAW_XPATH": "concat(/MYELEC/JOUR_PREC_HC, 'kwh (', /MYELEC/JOUR_PREC_HCC, 'eur)')",
+				"POLLING": "1"
+			}
+		}
+  ]
+}
