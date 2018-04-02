@@ -1,7 +1,7 @@
 <?php  
             $xml = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\" ?>";  
 	       //**********************************************************************************************************
-            // V2.0 : Script de suivi de la consommation électrique
+            // V2.01 : Script de suivi de la consommation électrique
             //*************************************** ******************************************************************
             // recuperation des infos depuis la requete
             // API CONSO INSTANTANEE - VAR1
@@ -254,199 +254,205 @@
 			//**********************************************************************************
 			// Mise à jour de la consommation
             if ($action == 'updateconso') {
-            		// restitution de la valeur actuel du compteur
-            		$value = getValue($api_compteur);
-            		$etat_compteur = $value['value'];
-            		$xml .= "<VALCOMPTEUR>".$etat_compteur."</VALCOMPTEUR>";
-            		$releve_conso = 0;
-            		// restitution du précédent relevé du compteur (si état cumul)
-					if ($type_cumul) {
-						$mesure .= " (CUMUL)";
-						$dernier_releve = $etat_compteur;
-						if (loadVariable('MYELEC_LASTRELEVE_'.$api_compteur) != '') {
-							$dernier_releve = loadVariable('MYELEC_LASTRELEVE_'.$api_compteur);
-						} 
-						$xml .= "<LASTVALCOMPTEUR>".$dernier_releve."</LASTVALCOMPTEUR>";
-						if ($etat_compteur < $dernier_releve) {
-							$releve_conso = round(($etat_compteur / 1000), 4);
-						}
-						else {
-							$releve_conso = round((($etat_compteur - $dernier_releve) / 1000), 4);
-						}
-						saveVariable('MYELEC_LASTRELEVE_'.$api_compteur, $etat_compteur);
-						
-						if (loadVariable('MYELEC_CPT_'.$api_compteur) != '') {
-							$tab_cpt = loadVariable('MYELEC_CPT_'.$api_compteur);
-						} else {
-							$tab_cpt['hp'] = 0;
-							$tab_cpt['hc'] = 0;
-						}
-											
-            		
-					} else if ($type_instant) { // a priori des watt mesurés en 1 mn
-						$mesure .= " (INSTANT)";
-						$releve_conso = round(($etat_compteur / 60000), 4);
+            	// restitution de la valeur actuel du compteur
+            	$value = getValue($api_compteur);
+            	$etat_compteur = $value['value'];
+            	$xml .= "<VALCOMPTEUR>".$etat_compteur."</VALCOMPTEUR>";
+            	$releve_conso = 0;
+            	// restitution du précédent relevé du compteur (si état cumul)
+				if ($type_cumul) {
+					$mesure .= " (CUMUL)";
+					$dernier_releve = $etat_compteur;
+					$preload = loadVariable('MYELEC_LASTRELEVE_'.$api_compteur);
+					if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
+						$dernier_releve = $preload;
+					} 
+					$xml .= "<LASTVALCOMPTEUR>".$dernier_releve."</LASTVALCOMPTEUR>";
+					if ($etat_compteur < $dernier_releve) {
+						$releve_conso = round(($etat_compteur / 1000), 4);
 					}
-					// cout en kwh
-					$cout = round(($releve_conso * (double)$tarif_dev), 6);
+					else {
+						$releve_conso = round((($etat_compteur - $dernier_releve) / 1000), 4);
+					}
+					saveVariable('MYELEC_LASTRELEVE_'.$api_compteur, $etat_compteur);
 					
-					if (loadVariable('MYELEC_RELEVES_'.$api_compteur) != '') {
-						$tab_releves = loadVariable('MYELEC_RELEVES_'.$api_compteur);
-						
+					$preload = loadVariable('MYELEC_CPT_'.$api_compteur);
+					if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
+						$tab_cpt = $preload;					
 					} else {
-						$tab_releves = array ("jour_hp" => 0.0000, "jour_hc" => 0.0000, "jour_prec_hp" => 0.0000, "jour_prec_hc" => 0.0000, 
-																 "mois_hp" => 0.0000, "mois_hc" => 0.0000, "mois_prec_hp" => 0.0000, "mois_prec_hc" => 0.0000, 
-																 "annee_hp" => 0.0000, "annee_hc" => 0.0000, "annee_prec_hp" => 0.0000, "annee_prec_hc" => 0.0000, "lastmesure" => date('d')."-00:00");
-					}
-					$lasttime = substr($tab_releves['lastmesure'], 3, 5);
-					$lastday = substr($tab_releves['lastmesure'], 0, 2);
-					$razday = false;
-					$razmois = false;
-					$razannee = false;
-					// si dernière mesure veille
-					if ($lastday != date('d')) {
-						$razday = true;
-						if (date('j') == 1) {
-							$razmois = true;
-						}
-						if (date('n') == 1 && $razmois) {
-							$razannee = true;
-						}
-					}
-					if (loadVariable('MYELEC_COUTS_'.$api_compteur) != '') {
-						$tab_couts = loadVariable('MYELEC_COUTS_'.$api_compteur);
-					} else {
-						$tab_couts = array ("jour_hp" => 0.000000, "jour_hc" => 0.000000, "jour_prec_hp" => 0.000000, "jour_prec_hc" => 0.000000, 
-																 "mois_hp" => 0.000000, "mois_hc" => 0.000000, "mois_prec_hp" => 0.000000, "mois_prec_hc" => 0.000000, 
-																 "annee_hp" => 0.000000, "annee_hc" => 0.000000, "annee_prec_hp" => 0.000000, "annee_prec_hc" => 0.000000);
-					}
-					$releve_jour_hp = $tab_releves['jour_hp'];
-					$releve_jour_hc = $tab_releves['jour_hc'];
-					$releve_jour_prec_hp = $tab_releves['jour_prec_hp'];
-					$releve_jour_prec_hc = $tab_releves['jour_prec_hc'];
-					$releve_mois_hp = $tab_releves['mois_hp'];
-					$releve_mois_hc = $tab_releves['mois_hc'];
-					$releve_mois_prec_hp = $tab_releves['mois_prec_hp'];
-					$releve_mois_prec_hc = $tab_releves['mois_prec_hc'];
-					$releve_annee_hp = $tab_releves['annee_hp'];
-					$releve_annee_hc = $tab_releves['annee_hc'];
-					$releve_annee_prec_hp = $tab_releves['annee_prec_hp'];
-					$releve_annee_prec_hc = $tab_releves['annee_prec_hc'];
-					// ajout de la consommation au compteur respectif, releve et cout
-					
-					if ($hp) {
-						if ($type_cumul) {
-							$tab_cpt['hp'] += $releve_conso * 1000;
-						}
-						$releve_jour_hp += $releve_conso;
-						$tab_couts['jour_hp'] += $cout;
-						$releve_mois_hp += $releve_conso;
-						$tab_couts['mois_hp'] += $cout;
-						$releve_annee_hp += $releve_conso;
-						$tab_couts['annee_hp'] += $cout;
-					}
-					if ($hc) {
-						if ($type_cumul) {
-							$tab_cpt['hc'] += $releve_conso * 1000;
-						}
-						$releve_jour_hc += $releve_conso;
-						$tab_couts['jour_hc'] += $cout;
-						$releve_mois_hc += $releve_conso;
-						$tab_couts['mois_hc'] += $cout;
-						$releve_annee_hc += $releve_conso;
-						$tab_couts['annee_hc'] += $cout;
+						$tab_cpt['hp'] = 0;
+						$tab_cpt['hc'] = 0;
 					}
 					
-					// chargement prévisionnel annuel
-					$prevannuel = "...";
-					if (loadVariable('MYELEC_PREV_'.$api_compteur) != '') {
-						$prevannuel = loadVariable('MYELEC_PREV_'.$api_compteur);
+				} else if ($type_instant) { // a priori des watt mesurés en 1 mn
+					$mesure .= " (INSTANT)";
+					$releve_conso = round(($etat_compteur / 60000), 4);
+				}
+				
+				// cout en kwh
+				$cout = round(($releve_conso * (double)$tarif_dev), 6);
+				
+				// chargement des mesures précédentes
+				$preload = loadVariable('MYELEC_RELEVES_'.$api_compteur);
+				if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
+					$tab_releves = $preload;				
+				} else {
+					$tab_releves = array ("jour_hp" => 0.0000, "jour_hc" => 0.0000, "jour_prec_hp" => 0.0000, "jour_prec_hc" => 0.0000, 
+											"mois_hp" => 0.0000, "mois_hc" => 0.0000, "mois_prec_hp" => 0.0000, "mois_prec_hc" => 0.0000, 
+											"annee_hp" => 0.0000, "annee_hc" => 0.0000, "annee_prec_hp" => 0.0000, "annee_prec_hc" => 0.0000, "lastmesure" => date('d')."-00:00");
+				}
+				$lasttime = substr($tab_releves['lastmesure'], 3, 5);
+				$lastday = substr($tab_releves['lastmesure'], 0, 2);
+				$razday = false;
+				$razmois = false;
+				$razannee = false;
+				// si dernière mesure veille
+				if ($lastday != date('d')) {
+					$razday = true;
+					if (date('j') == 1) {
+						$razmois = true;
 					}
-					// REMISES A ZERO
-					
-					if ($razday) {
-						$nbprevcoutj = 0;
-						$releve_jour_prec_hp = $releve_jour_hp;
-						$prevcoutj = $tab_couts['jour_prec_hp'] + $tab_couts['jour_prec_hc'];
-						if ($prevcoutj > 0) {
-							$nbprevcoutj = 1;
-						}
-						$tab_couts['jour_prec_hp'] = $tab_couts['jour_hp'];
-						$releve_jour_prec_hc = $releve_jour_hc;
-						$tab_couts['jour_prec_hc'] = $tab_couts['jour_hc'];
-						$prevcoutj = $prevcoutj + $tab_couts['jour_prec_hp'] + $tab_couts['jour_prec_hc'];
-						$nbprevcoutj++;
-						$releve_jour_hp = 0;
-						$releve_jour_hc = 0;
-						$tab_couts['jour_hp'] = 0;
-						$tab_couts['jour_hc'] = 0;
+					if (date('n') == 1 && $razmois) {
+						$razannee = true;
 					}
-					
-					if ($razmois) {
-						$nbprevcout = 0;
-						$releve_mois_prec_hp = $releve_mois_hp;
-						$prevcout = $tab_couts['mois_prec_hp'] + $tab_couts['mois_prec_hc'];
-						if ($prevcout > 0) {
-							$nbprevcout = 1;
-						}
-						$tab_couts['mois_prec_hp'] = $tab_couts['mois_hp'];
-						$releve_mois_prec_hc = $releve_mois_hc;
-						$tab_couts['mois_prec_hc'] = $tab_couts['mois_hc'];
-						$prevcout = $prevcout + $tab_couts['mois_prec_hp'] + $tab_couts['mois_prec_hc'];
-						$nbprevcout++;
-						$releve_mois_hp = 0;
-						$releve_mois_hc = 0;
-						$tab_couts['mois_hp'] = 0;
-						$tab_couts['mois_hc'] = 0;
-					}
-					if ($razannee) {
-						$releve_annee_prec_hp = $releve_annee_hp;
-						$tab_couts['annee_prec_hp'] = $tab_couts['annee_hp'];
-						$releve_annee_prec_hc = $releve_annee_hc;
-						$tab_couts['annee_prec_hc'] = $tab_couts['annee_hc'];
-						$releve_annee_hp = 0;
-						$releve_annee_hc = 0;
-						$tab_couts['annee_hp'] = 0;
-						$tab_couts['annee_hc'] = 0;
-					}
-					$tab_releves['jour_hp'] = $releve_jour_hp;
-					$tab_releves['jour_hc'] = $releve_jour_hc;
-					$tab_releves['jour_prec_hp'] = $releve_jour_prec_hp;
-					$tab_releves['jour_prec_hc'] = $releve_jour_prec_hc;
-					$tab_releves['mois_hp'] = $releve_mois_hp;
-					$tab_releves['mois_hc'] = $releve_mois_hc;
-					$tab_releves['annee_hp'] = $releve_annee_hp;
-					$tab_releves['annee_hc'] = $releve_annee_hc;
-					$tab_releves['annee_prec_hp'] = $releve_annee_prec_hp;
-					$tab_releves['annee_prec_hc'] = $releve_annee_prec_hc;
-					$tab_releves['lastmesure'] = date('d')."-".$maintenant;
-					saveVariable('MYELEC_RELEVES_'.$api_compteur, $tab_releves);
-					saveVariable('MYELEC_COUTS_'.$api_compteur, $tab_couts);
+				}
+				$preload = loadVariable('MYELEC_COUTS_'.$api_compteur);
+				if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
+					$tab_couts = $preload;
+				} else {
+					$tab_couts = array ("jour_hp" => 0.000000, "jour_hc" => 0.000000, "jour_prec_hp" => 0.000000, "jour_prec_hc" => 0.000000, 
+											"mois_hp" => 0.000000, "mois_hc" => 0.000000, "mois_prec_hp" => 0.000000, "mois_prec_hc" => 0.000000, 
+											"annee_hp" => 0.000000, "annee_hc" => 0.000000, "annee_prec_hp" => 0.000000, "annee_prec_hc" => 0.000000);
+				}
+				$releve_jour_hp = $tab_releves['jour_hp'];
+				$releve_jour_hc = $tab_releves['jour_hc'];
+				$releve_jour_prec_hp = $tab_releves['jour_prec_hp'];
+				$releve_jour_prec_hc = $tab_releves['jour_prec_hc'];
+				$releve_mois_hp = $tab_releves['mois_hp'];
+				$releve_mois_hc = $tab_releves['mois_hc'];
+				$releve_mois_prec_hp = $tab_releves['mois_prec_hp'];
+				$releve_mois_prec_hc = $tab_releves['mois_prec_hc'];
+				$releve_annee_hp = $tab_releves['annee_hp'];
+				$releve_annee_hc = $tab_releves['annee_hc'];
+				$releve_annee_prec_hp = $tab_releves['annee_prec_hp'];
+				$releve_annee_prec_hc = $tab_releves['annee_prec_hc'];
+				// ajout de la consommation au compteur respectif, releve et cout
+				if ($hp) {
 					if ($type_cumul) {
-						saveVariable('MYELEC_CPT_'.$api_compteur, $tab_cpt);
+						$tab_cpt['hp'] += $releve_conso * 1000;
 					}
-					if ($hp) {
-						$mesure .= " ".$releve_jour_hp." kwh";
+					$releve_jour_hp += $releve_conso;
+					$tab_couts['jour_hp'] += $cout;
+					$releve_mois_hp += $releve_conso;
+					$tab_couts['mois_hp'] += $cout;
+					$releve_annee_hp += $releve_conso;
+					$tab_couts['annee_hp'] += $cout;
+				}
+				if ($hc) {
+					if ($type_cumul) {
+						$tab_cpt['hc'] += $releve_conso * 1000;
 					}
-					if ($hc) {
-						$mesure .= " ".$releve_jour_hc." kwh";
-					}
-					$prevannuel = "...";
-					if ($nbprevcoutj > 0 && $prevannuel == "...") {
-						$prevannuel = round($prevcoutj * 365 / $nbprevcoutj,2);
-					}
-					if ($nbprevcout > 0) {
-						$prevannuel = round($prevcout * 12 / $nbprevcout,2);
-						
-					}
-					saveVariable('MYELEC_PREV_'.$api_compteur, $prevannuel);
-					$mesure .= " (prev. ".$prevannuel." eur/an)";
-					$xml .= "<STATUT>".$mesure."</STATUT>";
+					$releve_jour_hc += $releve_conso;
+					$tab_couts['jour_hc'] += $cout;
+					$releve_mois_hc += $releve_conso;
+					$tab_couts['mois_hc'] += $cout;
+					$releve_annee_hc += $releve_conso;
+					$tab_couts['annee_hc'] += $cout;
+				}
+				
+				// chargement prévisionnel annuel
+				$prevannuel = "...";
+				$preload = loadVariable('MYELEC_PREV_'.$api_compteur);
+				if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
+					$prevannuel = $preload;
+				}
+				// REMISES A ZERO
 					
-					// Mise à jour hors polling des compteurs J, J-1...
+				if ($razday) {
+					$nbprevcoutj = 0;
+					$releve_jour_prec_hp = $releve_jour_hp;
+					$prevcoutj = $tab_couts['jour_prec_hp'] + $tab_couts['jour_prec_hc'];
+					if ($prevcoutj > 0) {
+						$nbprevcoutj = 1;
+					}
+					$tab_couts['jour_prec_hp'] = $tab_couts['jour_hp'];
+					$releve_jour_prec_hc = $releve_jour_hc;
+					$tab_couts['jour_prec_hc'] = $tab_couts['jour_hc'];
+					$prevcoutj = $prevcoutj + $tab_couts['jour_prec_hp'] + $tab_couts['jour_prec_hc'];
+					$nbprevcoutj++;
+					$releve_jour_hp = 0;
+					$releve_jour_hc = 0;
+					$tab_couts['jour_hp'] = 0;
+					$tab_couts['jour_hc'] = 0;
+				}
+					
+				if ($razmois) {
+					$nbprevcout = 0;
+					$releve_mois_prec_hp = $releve_mois_hp;
+					$prevcout = $tab_couts['mois_prec_hp'] + $tab_couts['mois_prec_hc'];
+					if ($prevcout > 0) {
+						$nbprevcout = 1;
+					}
+					$tab_couts['mois_prec_hp'] = $tab_couts['mois_hp'];
+					$releve_mois_prec_hc = $releve_mois_hc;
+					$tab_couts['mois_prec_hc'] = $tab_couts['mois_hc'];
+					$prevcout = $prevcout + $tab_couts['mois_prec_hp'] + $tab_couts['mois_prec_hc'];
+					$nbprevcout++;
+					$releve_mois_hp = 0;
+					$releve_mois_hc = 0;
+					$tab_couts['mois_hp'] = 0;
+					$tab_couts['mois_hc'] = 0;
+				}
+				if ($razannee) {
+					$releve_annee_prec_hp = $releve_annee_hp;
+					$tab_couts['annee_prec_hp'] = $tab_couts['annee_hp'];
+					$releve_annee_prec_hc = $releve_annee_hc;
+					$tab_couts['annee_prec_hc'] = $tab_couts['annee_hc'];
+					$releve_annee_hp = 0;
+					$releve_annee_hc = 0;
+					$tab_couts['annee_hp'] = 0;
+					$tab_couts['annee_hc'] = 0;
+				}
+				$tab_releves['jour_hp'] = $releve_jour_hp;
+				$tab_releves['jour_hc'] = $releve_jour_hc;
+				$tab_releves['jour_prec_hp'] = $releve_jour_prec_hp;
+				$tab_releves['jour_prec_hc'] = $releve_jour_prec_hc;
+				$tab_releves['mois_hp'] = $releve_mois_hp;
+				$tab_releves['mois_hc'] = $releve_mois_hc;
+				$tab_releves['mois_prec_hp'] = $releve_mois_prec_hp;
+				$tab_releves['mois_prec_hc'] = $releve_mois_prec_hc;
+				$tab_releves['annee_hp'] = $releve_annee_hp;
+				$tab_releves['annee_hc'] = $releve_annee_hc;
+				$tab_releves['annee_prec_hp'] = $releve_annee_prec_hp;
+				$tab_releves['annee_prec_hc'] = $releve_annee_prec_hc;
+				$tab_releves['lastmesure'] = date('d')."-".$maintenant;
+				saveVariable('MYELEC_RELEVES_'.$api_compteur, $tab_releves);
+				saveVariable('MYELEC_COUTS_'.$api_compteur, $tab_couts);
+				if ($type_cumul) {
+					saveVariable('MYELEC_CPT_'.$api_compteur, $tab_cpt);
+				}
+				if ($hp) {
+					$mesure .= " ".$releve_jour_hp." kwh";
+				}
+				if ($hc) {
+					$mesure .= " ".$releve_jour_hc." kwh";
+				}
+				$prevannuel = "...";
+				if ($nbprevcoutj > 0 && $prevannuel == "...") {
+					$prevannuel = round($prevcoutj * 365 / $nbprevcoutj,2);
+				}
+				if ($nbprevcout > 0) {
+					$prevannuel = round($prevcout * 12 / $nbprevcout,2);
+					
+				}
+				saveVariable('MYELEC_PREV_'.$api_compteur, $prevannuel);
+				$mesure .= " (prev. ".$prevannuel." eur/an)";
+				$xml .= "<STATUT>".$mesure."</STATUT>";
+					
+				// Mise à jour hors polling des compteurs J, J-1...
 				if ($tab_api_cpt_ok) {
-					setValue($tab_api_current_cpt['jour_hp'], round(releve_jour_hp,3)."kWh (".round($tab_couts['jour_hp'],3)."eur", $update_only = true);
-					setValue($tab_api_current_cpt['jour_hc'], round(releve_jour_hc,3)."kWh (".round($tab_couts['jour_hc'],3)."eur", $update_only = true);
+					setValue($tab_api_current_cpt['jour_hp'], round($releve_jour_hp,3)."kWh (".round($tab_couts['jour_hp'],3)."eur", $update_only = true);
+					setValue($tab_api_current_cpt['jour_hc'], round($releve_jour_hc,3)."kWh (".round($tab_couts['jour_hc'],3)."eur", $update_only = true);
 					setValue($tab_api_current_cpt['mois_hp'], round($releve_mois_hp,3)."kWh (".round($tab_couts['mois_hp'],3)."eur", $update_only = true);
 					setValue($tab_api_current_cpt['mois_hc'], round($releve_mois_hc,3)."kWh (".round($tab_couts['mois_hc'],3)."eur", $update_only = true);
 					setValue($tab_api_current_cpt['annee_hp'], round($releve_annee_hp,3)."kWh (".round($tab_couts['annee_hp'],3)."eur", $update_only = true);
@@ -473,7 +479,7 @@
 						setValue($tab_api_current_cpt['annee_prec_hc'], round($releve_annee_prec_hc,3)."kWh (".round($tab_couts['annee_prec_hc'],3)."eur", $update_only = true);
 					}
 					if ($tab_api_current_cpt['cpt_delta_hc'] != 0) {
-							setValue($tab_api_current_cpt['cpt_delta_hc'], $tab_cpt['hc'] + $delta_hc, $update_only = true);
+						setValue($tab_api_current_cpt['cpt_delta_hc'], $tab_cpt['hc'] + $delta_hc, $update_only = true);
 					}
 		       	}
             }	
@@ -496,12 +502,15 @@
           	$cpt_hp = $delta_hp;
            	$cpt_hc = $delta_hc;
            	$tab_init = array ("jour_hp" => 0.0000, "jour_hc" => 0.0000, "jour_prec_hp" => 0.0000, "jour_prec_hc" => 0.0000, 
-																 "mois_hp" => 0.0000, "mois_hc" => 0.0000, "mois_prec_hp" => 0.0000, "mois_prec_hc" => 0.0000, 
-																 "annee_hp" => 0.0000, "annee_hc" => 0.0000, "annee_prec_hp" => 0.0000, "annee_prec_hc" => 0.0000, "lastmesure" => date('d')."-00:00");
-														 
-           	if (loadVariable('MYELEC_RELEVES_'.$api_compteur) != '') {
-           		$tab_init = loadVariable('MYELEC_RELEVES_'.$api_compteur);
-           	}
+								"mois_hp" => 0.0000, "mois_hc" => 0.0000, "mois_prec_hp" => 0.0000, "mois_prec_hc" => 0.0000, 
+								"annee_hp" => 0.0000, "annee_hc" => 0.0000, "annee_prec_hp" => 0.0000, "annee_prec_hc" => 0.0000, "lastmesure" => date('d')."-00:00");
+			
+			// restitution de la valeur actuel du compteur
+			$preload = loadVariable('MYELEC_RELEVES_'.$api_compteur);
+			if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
+               	$tab_init = $preload;
+            }			
+           	
            	$xml .= "<JOUR_HP>".round($tab_init['jour_hp'],3)."</JOUR_HP>";
            	$xml .= "<JOUR_HC>".round($tab_init['jour_hc'],3)."</JOUR_HC>";
            	$xml .= "<MOIS_HP>".round($tab_init['mois_hp'],3)."</MOIS_HP>";
@@ -516,8 +525,9 @@
            	$xml .= "<MOIS_PREC_HC>".round($tab_init['mois_prec_hc'],3)."</MOIS_PREC_HC>";
 				
            	if ($type_cumul) {
-				if (loadVariable('MYELEC_CPT_'.$api_compteur) != '') {
-					$tab_cpt = loadVariable('MYELEC_CPT_'.$api_compteur);
+				$preload = loadVariable('MYELEC_CPT_'.$api_compteur);
+				if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
+					$tab_cpt = $preload;
 					$cpt_hp = $tab_cpt['hp'] + $delta_hp;
 					$cpt_hc = $tab_cpt['hc'] + $delta_hc;
 				}
@@ -526,13 +536,15 @@
            	$xml .= "<CPT_DELTA_HC>".$cpt_hc."</CPT_DELTA_HC>";
            	
            	$tab_initc = array ("jour_hp" => 0.000000, "jour_hc" => 0.000000, "jour_prec_hp" => 0.000000, "jour_prec_hc" => 0.000000, 
-															 "mois_hp" => 0.000000, "mois_hc" => 0.000000, "mois_prec_hp" => 0.000000, "mois_prec_hc" => 0.000000, 
-															 "annee_hp" => 0.000000, "annee_hc" => 0.000000, "annee_prec_hp" => 0.000000, "annee_prec_hc" => 0.000000);		
+								"mois_hp" => 0.000000, "mois_hc" => 0.000000, "mois_prec_hp" => 0.000000, "mois_prec_hc" => 0.000000, 
+								"annee_hp" => 0.000000, "annee_hc" => 0.000000, "annee_prec_hp" => 0.000000, "annee_prec_hc" => 0.000000);		
 			
            	// restitution de la valeur actuel des couts
-           	if (loadVariable('MYELEC_COUTS_'.$api_compteur) != '') {
-           		$tab_initc = loadVariable('MYELEC_COUTS_'.$api_compteur);
-           	}
+			$preload = loadVariable('MYELEC_COUTS_'.$api_compteur);
+			if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
+				$tab_initc = $preload;
+            }
+           	
            	$xml .= "<JOUR_HPC>".round($tab_initc['jour_hp'],3)."</JOUR_HPC>";
            	$xml .= "<JOUR_HCC>".round($tab_initc['jour_hc'],3)."</JOUR_HCC>";
            	$xml .= "<MOIS_HPC>".round($tab_initc['mois_hp'],3)."</MOIS_HPC>";
@@ -547,10 +559,11 @@
            	$xml .= "<MOIS_PREC_HCC>".round($tab_initc['mois_prec_hc'],3)."</MOIS_PREC_HCC>";
 			
 			if ($arg_value != '') {
-				if (loadVariable('MYELECAPI_CPT_'.$api_compteur) != '') {
-					// charge le tableau des API des différents compeuts J, J-1...
-                    $tab_api_current_cpt = loadVariable('MYELECAPI_CPT_'.$api_compteur);
-					$maj_tab_cpt = false;
+				$preload = loadVariable('MYELECAPI_CPT_'.$api_compteur);
+				if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
+					// charge le tableau des API des différents compeurs J, J-1...
+                    $tab_api_current_cpt = $preload;
+				    $maj_tab_cpt = false;
                    	if ($arg_value == "jour_hp" and $tab_api_current_cpt['jour_hp'] != $api_script) {
 						$tab_api_current_cpt['jour_hp'] = $api_script;
 						$maj_tab_cpt = true;
@@ -617,37 +630,33 @@
         // mise à zéro
         if ($action == 'raz') {
 			if ($type_instant || $type_cumul) {
-			$tab_init = array ("jour_hp" => 0.0000, "jour_hc" => 0.0000, "jour_prec_hp" => 0.0000, "jour_prec_hc" => 0.0000, 
+				$tab_init = array ("jour_hp" => 0.0000, "jour_hc" => 0.0000, "jour_prec_hp" => 0.0000, "jour_prec_hc" => 0.0000, 
 															 "mois_hp" => 0.0000, "mois_hc" => 0.0000, "mois_prec_hp" => 0.0000, "mois_prec_hc" => 0.0000, 
 															 "annee_hp" => 0.0000, "annee_hc" => 0.0000, "annee_prec_hp" => 0.0000, "annee_prec_hc" => 0.0000, "lastmesure" => date('d')."-00:00");
-			$tab_initc = array ("jour_hp" => 0.000000, "jour_hc" => 0.000000, "jour_prec_hp" => 0.000000, "jour_prec_hc" => 0.000000, 
+				$tab_initc = array ("jour_hp" => 0.000000, "jour_hc" => 0.000000, "jour_prec_hp" => 0.000000, "jour_prec_hc" => 0.000000, 
 															 "mois_hp" => 0.000000, "mois_hc" => 0.000000, "mois_prec_hp" => 0.000000, "mois_prec_hc" => 0.000000, 
 															 "annee_hp" => 0.000000, "annee_hc" => 0.000000, "annee_prec_hp" => 0.000000, "annee_prec_hc" => 0.000000);
 			
-			if (loadVariable('MYELEC_RELEVES_'.$api_compteur) != '') {
-					saveVariable('MYELEC_RELEVES_'.$api_compteur, $tab_init);
-            	}	
-            	if (loadVariable('MYELEC_COUTS_'.$api_compteur) != '') {
-            		saveVariable('MYELEC_COUTS_'.$api_compteur, $tab_initc);
-            	}	
-            	
-				if (loadVariable('MYELEC_LASTRELEVE_'.$api_compteur) != '') {
-					saveVariable('MYELEC_LASTRELEVE_'.$api_compteur, 0);
-				}	
-				if (loadVariable('MYELEC_CPT_'.$api_compteur) != '') {
-					$tab_cpt = loadVariable('MYELEC_CPT_'.$api_compteur);
+				saveVariable('MYELEC_RELEVES_'.$api_compteur, $tab_init);
+            	saveVariable('MYELEC_COUTS_'.$api_compteur, $tab_initc);
+            	saveVariable('MYELEC_LASTRELEVE_'.$api_compteur, 0);
+				
+				$preload = loadVariable('MYELEC_CPT_'.$api_compteur);
+				if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
+					$tab_cpt = $preload;
 					$tab_cpt['hp'] = 0;
 					$tab_cpt['hc'] = 0;
 					saveVariable('MYELEC_CPT_'.$api_compteur, $tab_cpt);
 				}	
-				if (loadVariable('MYELEC_PREV_'.$api_compteur) != '') {
+				$preload = loadVariable('MYELEC_PREV_'.$api_compteur);
+				if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
 					saveVariable('MYELEC_PREV_'.$api_compteur, "...");
 				}
 				die();
            	} 
 		}
 		
-		// mise à jour
+		// mise à jour manuelle
         if ($action == 'maj') {
 				$tab_reinit = array ("jour_hp" => 0.0000, "jour_hc" => 0.0000, "jour_prec_hp" => 0.0000, "jour_prec_hc" => 0.0000, 
 																 "mois_hp" => 0.0000, "mois_hc" => 0.0000, "mois_prec_hp" => 0.0000, "mois_prec_hc" => 0.0000, 
@@ -655,117 +664,118 @@
 				$tab_reinitc = array ("jour_hp" => 0.000000, "jour_hc" => 0.000000, "jour_prec_hp" => 0.000000, "jour_prec_hc" => 0.000000, 
 																 "mois_hp" => 0.000000, "mois_hc" => 0.000000, "mois_prec_hp" => 0.000000, "mois_prec_hc" => 0.000000, 
 																 "annee_hp" => 0.000000, "annee_hc" => 0.000000, "annee_prec_hp" => 0.000000, "annee_prec_hc" => 0.000000);		
-				if ($type_cumul || $type_instant) {
-					$xml .= "<MAJ>".$type." - ".$arg_value."</MAJ>";
-					if (loadVariable('MYELEC_RELEVES_'.$api_compteur) != '') {
-							$tab_reinit= loadVariable('MYELEC_RELEVES_'.$api_compteur);
-							if ($type == 'JOUR_HP' && $arg_value != "") {
-								$tab_reinit['jour_hp'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'JOUR_PREC_HP' && $arg_value != "") {
-								$tab_reinit['jour_prec_hp'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'MOIS_HP' && $arg_value != "") {
-								$tab_reinit['mois_hp'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'MOIS_PREC_HP' && $arg_value != "") {
-								$tab_reinit['mois_prec_hp'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'ANNEE_HP' && $arg_value != "") {
-								$tab_reinit['annee_hp'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'ANNEE_PREC_HP' && $arg_value != "") {
-								$tab_reinit['annee_prec_hp'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'JOUR_HC' && $arg_value != "") {
-								$tab_reinit['jour_hc'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'JOUR_PREC_HC' && $arg_value != "") {
-								$tab_reinit['jour_prec_hc'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'MOIS_HC' && $arg_value != "") {
-								$tab_reinit['mois_hc'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'MOIS_PREC_HC' && $arg_value != "") {
-								$tab_reinit['mois_prec_hc'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'ANNEE_HC' && $arg_value != "") {
-								$tab_reinit['annee_hc'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'ANNEE_PREC_HC' && $arg_value != "") {
-								$tab_reinit['annee_prec_hc'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
+				$xml .= "<MAJ>".$type." - ".$arg_value."</MAJ>";
+				$preload = loadVariable('MYELEC_RELEVES_'.$api_compteur);
+				if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
+					$tab_reinit= $preload;
+					$type = strtoupper($type);
+					if ($type == 'JOUR_HP' && $arg_value != "") {
+						$tab_reinit['jour_hp'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'JOUR_PREC_HP' && $arg_value != "") {
+						$tab_reinit['jour_prec_hp'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'MOIS_HP' && $arg_value != "") {
+						$tab_reinit['mois_hp'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'MOIS_PREC_HP' && $arg_value != "") {
+						$tab_reinit['mois_prec_hp'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'ANNEE_HP' && $arg_value != "") {
+						$tab_reinit['annee_hp'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'ANNEE_PREC_HP' && $arg_value != "") {
+						$tab_reinit['annee_prec_hp'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'JOUR_HC' && $arg_value != "") {
+						$tab_reinit['jour_hc'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'JOUR_PREC_HC' && $arg_value != "") {
+						$tab_reinit['jour_prec_hc'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'MOIS_HC' && $arg_value != "") {
+						$tab_reinit['mois_hc'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'MOIS_PREC_HC' && $arg_value != "") {
+						$tab_reinit['mois_prec_hc'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'ANNEE_HC' && $arg_value != "") {
+						$tab_reinit['annee_hc'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'ANNEE_PREC_HC' && $arg_value != "") {
+						$tab_reinit['annee_prec_hc'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
 							
-							saveVariable('MYELEC_RELEVES', $tab_reinit);
+					saveVariable('MYELEC_RELEVES_'.$api_compteur, $tab_reinit);
 						
-            		
+            	}	
+					
+				$preload = loadVariable('MYELEC_COUTS_'.$api_compteur);
+				if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {	
+					$tab_reinitc = $preload;
+					$type = strtoupper($type);
+					if ($type == 'JOUR_HPC' && $arg_value != "") {
+						$tab_reinitc['jour_hp'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
 					}
-				
-					if (loadVariable('MYELECG_COUTS_'.$api_compteur) != '') {
-							$tab_reinitc = loadVariable('MYELECG_COUTS_'.$api_compteur);
-							if ($type == 'JOUR_HPC' && $arg_value != "") {
-								$tab_reinitc['jour_hp'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'JOUR_PREC_HPC' && $arg_value != "") {
-								$tab_reinitc['jour_prec_hp'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'MOIS_HPC' && $arg_value != "") {
-								$tab_reinitc['mois_hp'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'MOIS_PREC_HPC' && $arg_value != "") {
-								$tab_reinitc['mois_prec_hp'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'ANNEE_HPC' && $arg_value != "") {
-								$tab_reinitc['annee_hp'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'ANNEE_PREC_HPC' && $arg_value != "") {
-								$tab_reinitc['annee_prec_hp'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'JOUR_HCC' && $arg_value != "") {
-								$tab_reinitc['jour_hc'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'JOUR_PREC_HCC' && $arg_value != "") {
-								$tab_reinitc['jour_prec_hc'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'MOIS_HCC' && $arg_value != "") {
-								$tab_reinitc['mois_hc'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'MOIS_PREC_HCC' && $arg_value != "") {
-								$tab_reinitc['mois_prec_hc'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'ANNEE_HCC' && $arg_value != "") {
-								$tab_reinitc['annee_hc'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							if ($type == 'ANNEE_PREC_HCC' && $arg_value != "") {
-								$tab_reinitc['annee_prec_hc'] = $arg_value;
-								$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
-							}
-							
-							saveVariable('MYELEC_COUTS', $tab_reinitc);
+					if ($type == 'JOUR_PREC_HPC' && $arg_value != "") {
+						$tab_reinitc['jour_prec_hp'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
 					}
+					if ($type == 'MOIS_HPC' && $arg_value != "") {
+						$tab_reinitc['mois_hp'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'MOIS_PREC_HPC' && $arg_value != "") {
+						$tab_reinitc['mois_prec_hp'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'ANNEE_HPC' && $arg_value != "") {
+						$tab_reinitc['annee_hp'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'ANNEE_PREC_HPC' && $arg_value != "") {
+						$tab_reinitc['annee_prec_hp'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'JOUR_HCC' && $arg_value != "") {
+						$tab_reinitc['jour_hc'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'JOUR_PREC_HCC' && $arg_value != "") {
+						$tab_reinitc['jour_prec_hc'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'MOIS_HCC' && $arg_value != "") {
+						$tab_reinitc['mois_hc'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'MOIS_PREC_HCC' && $arg_value != "") {
+						$tab_reinitc['mois_prec_hc'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'ANNEE_HCC' && $arg_value != "") {
+						$tab_reinitc['annee_hc'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					if ($type == 'ANNEE_PREC_HCC' && $arg_value != "") {
+						$tab_reinitc['annee_prec_hc'] = $arg_value;
+						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
+					}
+					saveVariable('MYELEC_COUTS', $tab_reinitc);
+					
             	}	
             					
 				
@@ -779,30 +789,33 @@
 																 "mois_hp" => 0.000000, "mois_hc" => 0.000000, "mois_prec_hp" => 0.000000, "mois_prec_hc" => 0.000000, 
 																 "annee_hp" => 0.000000, "annee_hc" => 0.000000, "annee_prec_hp" => 0.000000, "annee_prec_hc" => 0.000000);		
 				
-			
-			if (loadVariable('MYELEC_RELEVES') != '') {
-				$tab_releves = loadVariable('MYELEC_RELEVES');
+			$preload = loadVariable('MYELEC_RELEVES');
+			if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {	
+				$tab_releves = $preload;
 				if (array_key_exists($api_compteur, $tab_releves)) {
 					$tab_reinit = $tab_releves[$api_compteur];
 					saveVariable('MYELEC_RELEVES_'.$api_compteur, $tab_reinit);
 					
-					if (loadVariable('MYELEC_COUTS') != '') {
-						$tab_couts= loadVariable('MYELEC_COUTS');
+					$preload = loadVariable('MYELEC_COUTS');
+					if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {	
+						$tab_couts= $preload;
 						if (array_key_exists($api_compteur, $tab_couts)) {
 							$tab_reinitc = $tab_couts[$api_compteur];
 						}
 						saveVariable('MYELEC_COUTS_'.$api_compteur, $tab_reinitc);
 					}
 					
-					if (loadVariable('MYELEC_CPT') != '') {
-						$tab_cpt = loadVariable('MYELEC_CPT');
+					$preload = loadVariable('MYELEC_CPT');
+					if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {	
+						$tab_cpt = $preload;
 						if (array_key_exists($api_compteur, $tab_cpt)) {
 							saveVariable('MYELEC_CPT_'.$api_compteur, $tab_cpt[$api_compteur]);
 						}
 					} 
 					
-					if (loadVariable('MYELEC_LASTRELEVE') != '') {
-						$tab_dernierreleve = loadVariable('MYELEC_LASTRELEVE');
+					$preload = loadVariable('MYELEC_LASTRELEVE');
+					if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {	
+						$tab_dernierreleve = $preload;
 						if (array_key_exists($api_compteur, $tab_dernierreleve)) {
 							saveVariable('MYELEC_LASTRELEVE_'.$api_compteur, $tab_dernierreleve[$api_compteur]);
 						}
