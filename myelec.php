@@ -774,7 +774,7 @@
 						$tab_reinitc['annee_prec_hc'] = $arg_value;
 						$xml .= "<MAJ_RESULT>OK</MAJ_RESULT>";
 					}
-					saveVariable('MYELEC_COUTS', $tab_reinitc);
+					saveVariable('MYELEC_COUTS_'.$api_compteur, $tab_reinitc);
 					
             	}	
             					
