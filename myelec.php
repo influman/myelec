@@ -1,23 +1,23 @@
 <?php  
-            $xml = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\" ?>";  
+           $xml = "<?xml version=\"1.0\" encoding=\"ISO-8859-1\" ?>";  
 	       //**********************************************************************************************************
-            // V2.01 : Script de suivi de la consommation électrique
+            // V2.04 : Script de suivi de la consommation électrique
             //*************************************** ******************************************************************
             // recuperation des infos depuis la requete
             // API CONSO INSTANTANEE - VAR1
-            $api_instant = getArg("apii", $mandatory = true, $default = 'undefined');
+            $api_instant = getArg("apii", true, 'undefined');
             // API CONSO CUMULEE - VAR2
-            $api_cumul = getArg("apic", $mandatory = true, $default = 'undefined');
+            $api_cumul = getArg("apic", true, 'undefined');
             // DELTA COMPTEUR REEL - VAR3
-            $delta = getArg("delta", $mandatory = false, $default = '0-0');
+            $delta = getArg("delta", false, '0-0');
             // action
-            $action = getArg("action", $mandatory = true, $default = '');
+            $action = getArg("action", true, '');
             // type
-            $type = getArg("type", $mandatory = false, $default = '');
+            $type = getArg("type", false, '');
             // valeur passée en argument
-            $arg_value = getArg("value", $mandatory = false, $default = '');
+            $arg_value = getArg("value", false, '');
 			// état qui donne HP HC directement
-            $eco = getArg("eco", $mandatory = false, $default = '');
+            $eco = getArg("eco", false, '');
            // API DU PERIPHERIQUE APPELANT LE SCRIPT
             $api_script = getArg('eedomus_controller_module_id'); 
  
@@ -77,7 +77,7 @@
 				$abo_ok = false;
             	$tarif_dev = 0;
 				$abobase = '';
-				$tab_api_cpt_ok = false;
+				//$tab_api_cpt_ok = false;
 				$tab_api_cpt_init = array ("jour_hp" => 0, "jour_prec_hp" => 0, "jour_hc" => 0, "jour_prec_hc" => 0, 
 								   "mois_hp" => 0, "mois_prec_hp" => 0, "mois_hc" => 0, "mois_prec_hc" => 0,
 								   "annee_hp" => 0, "annee_prec_hp" => 0, "cpt_delta_hp" => 0, "annee_hc" => 0, "annee_prec_hc" => 0, "cpt_delta_hc" => 0);
@@ -125,7 +125,7 @@
                     	$tarif_dev = $value['value_text'];
 				}
 				
-				if (loadVariable('MYELECAPI_CPT_'.$api_compteur) != '') {
+				/*if (loadVariable('MYELECAPI_CPT_'.$api_compteur) != '') {
 				// charge le tableau des API des différents compeuts J, J-1...
                     $tab_api_current_cpt = loadVariable('MYELECAPI_CPT_'.$api_compteur);
                     if ($tab_api_current_cpt['jour_hp'] != 0 and $tab_api_current_cpt['mois_hp'] != 0 and $tab_api_current_cpt['annee_hp'] != 0 and $tab_api_current_cpt['jour_hc'] != 0 and $tab_api_current_cpt['mois_hc'] != 0 and $tab_api_current_cpt['annee_hc'] != 0) {
@@ -139,7 +139,7 @@
 				else {
 					$tab_api_current_cpt = $tab_api_cpt_init;
 					saveVariable('MYELECAPI_CPT_'.$api_compteur, $tab_api_current_cpt);
-				}
+				} */
             }
 			// ********************************************************************************************
             // lecture/maj des capteurs Abonnement/tarif/hphc associé à ce compteur (cumulé ou instantané)
@@ -260,19 +260,27 @@
             	$xml .= "<VALCOMPTEUR>".$etat_compteur."</VALCOMPTEUR>";
             	$releve_conso = 0;
             	// restitution du précédent relevé du compteur (si état cumul)
+				$needupdate = false;
 				if ($type_cumul) {
 					$mesure .= " (CUMUL)";
-					$dernier_releve = $etat_compteur;
 					$preload = loadVariable('MYELEC_LASTRELEVE_'.$api_compteur);
-					if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
+					if ($preload == 0 || ($preload != '' && substr($preload, 0, 8) != "## ERROR")) {
 						$dernier_releve = $preload;
-					} 
+					} else {
+						$dernier_releve = $etat_compteur;
+					}
 					$xml .= "<LASTVALCOMPTEUR>".$dernier_releve."</LASTVALCOMPTEUR>";
-					if ($etat_compteur < $dernier_releve) {
-						$releve_conso = round(($etat_compteur / 1000), 4);
+					if ($etat_compteur < $dernier_releve) { // le compteur cumulé est plus bas que la dernière fois
+						$releve_conso = round(($etat_compteur / 1000), 4); // on prend la totalité de la valeur du compteur comme consommation
+						$needupdate = true;
 					}
 					else {
-						$releve_conso = round((($etat_compteur - $dernier_releve) / 1000), 4);
+						if ($etat_compteur == $dernier_releve) { // pas de changement du compteur depuis le dernier relevé
+							$releve_conso = 0;
+						} else {
+							$releve_conso = round((($etat_compteur - $dernier_releve) / 1000), 4); // sinon, on prend le delta de conso depuis le dernier relevé
+							$needupdate = true;
+						}
 					}
 					saveVariable('MYELEC_LASTRELEVE_'.$api_compteur, $etat_compteur);
 					
@@ -286,12 +294,14 @@
 					
 				} else if ($type_instant) { // a priori des watt mesurés en 1 mn
 					$mesure .= " (INSTANT)";
-					$releve_conso = round(($etat_compteur / 60000), 4);
+					if ($etat_compteur == 0) {
+						$releve_conso = 0;
+					} else {
+						$releve_conso = round(($etat_compteur / 60000), 4);
+						$needupdate = true;
+					}
 				}
-				
-				// cout en kwh
-				$cout = round(($releve_conso * (double)$tarif_dev), 6);
-				
+			if ($needupdate) {	
 				// chargement des mesures précédentes
 				$preload = loadVariable('MYELEC_RELEVES_'.$api_compteur);
 				if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
@@ -316,14 +326,7 @@
 						$razannee = true;
 					}
 				}
-				$preload = loadVariable('MYELEC_COUTS_'.$api_compteur);
-				if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
-					$tab_couts = $preload;
-				} else {
-					$tab_couts = array ("jour_hp" => 0.000000, "jour_hc" => 0.000000, "jour_prec_hp" => 0.000000, "jour_prec_hc" => 0.000000, 
-											"mois_hp" => 0.000000, "mois_hc" => 0.000000, "mois_prec_hp" => 0.000000, "mois_prec_hc" => 0.000000, 
-											"annee_hp" => 0.000000, "annee_hc" => 0.000000, "annee_prec_hp" => 0.000000, "annee_prec_hc" => 0.000000);
-				}
+				
 				$releve_jour_hp = $tab_releves['jour_hp'];
 				$releve_jour_hc = $tab_releves['jour_hc'];
 				$releve_jour_prec_hp = $tab_releves['jour_prec_hp'];
@@ -336,6 +339,19 @@
 				$releve_annee_hc = $tab_releves['annee_hc'];
 				$releve_annee_prec_hp = $tab_releves['annee_prec_hp'];
 				$releve_annee_prec_hc = $tab_releves['annee_prec_hc'];
+				
+				// cout en kwh
+				$cout = round(($releve_conso * (double)$tarif_dev), 6);
+				
+				$preload = loadVariable('MYELEC_COUTS_'.$api_compteur);
+				if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
+					$tab_couts = $preload;
+				} else {
+					$tab_couts = array ("jour_hp" => 0.000000, "jour_hc" => 0.000000, "jour_prec_hp" => 0.000000, "jour_prec_hc" => 0.000000, 
+											"mois_hp" => 0.000000, "mois_hc" => 0.000000, "mois_prec_hp" => 0.000000, "mois_prec_hc" => 0.000000, 
+											"annee_hp" => 0.000000, "annee_hc" => 0.000000, "annee_prec_hp" => 0.000000, "annee_prec_hc" => 0.000000);
+				}
+				
 				// ajout de la consommation au compteur respectif, releve et cout
 				if ($hp) {
 					if ($type_cumul) {
@@ -431,6 +447,7 @@
 				if ($type_cumul) {
 					saveVariable('MYELEC_CPT_'.$api_compteur, $tab_cpt);
 				}
+				
 				if ($hp) {
 					$mesure .= " ".$releve_jour_hp." kwh";
 				}
@@ -447,10 +464,11 @@
 				}
 				saveVariable('MYELEC_PREV_'.$api_compteur, $prevannuel);
 				$mesure .= " (prev. ".$prevannuel." eur/an)";
+			} // needupdate
 				$xml .= "<STATUT>".$mesure."</STATUT>";
 					
 				// Mise à jour hors polling des compteurs J, J-1...
-				if ($tab_api_cpt_ok) {
+				/* if ($tab_api_cpt_ok) {
 					setValue($tab_api_current_cpt['jour_hp'], round($releve_jour_hp,3)."kWh (".round($tab_couts['jour_hp'],3)."eur", $update_only = true);
 					setValue($tab_api_current_cpt['jour_hc'], round($releve_jour_hc,3)."kWh (".round($tab_couts['jour_hc'],3)."eur", $update_only = true);
 					setValue($tab_api_current_cpt['mois_hp'], round($releve_mois_hp,3)."kWh (".round($tab_couts['mois_hp'],3)."eur", $update_only = true);
@@ -481,7 +499,7 @@
 					if ($tab_api_current_cpt['cpt_delta_hc'] != 0) {
 						setValue($tab_api_current_cpt['cpt_delta_hc'], $tab_cpt['hc'] + $delta_hc, $update_only = true);
 					}
-		       	}
+		       	} */
             }	
 	    } else if ($action == 'updateconso') {
 	    		$xml .= "<STATUT>En attente compteur...</STATUT>";
@@ -558,7 +576,7 @@
 			$xml .= "<MOIS_PREC_HPC>".round($tab_initc['mois_prec_hp'],3)."</MOIS_PREC_HPC>";
            	$xml .= "<MOIS_PREC_HCC>".round($tab_initc['mois_prec_hc'],3)."</MOIS_PREC_HCC>";
 			
-			if ($arg_value != '') {
+			/*if ($arg_value != '') {
 				$preload = loadVariable('MYELECAPI_CPT_'.$api_compteur);
 				if ($preload != '' && substr($preload, 0, 8) != "## ERROR") {
 					// charge le tableau des API des différents compeurs J, J-1...
@@ -624,7 +642,7 @@
 						saveVariable('MYELECAPI_CPT_'.$api_compteur, $tab_api_current_cpt);
 					}
 				}
-			}
+			} */
         }
 	    // ***********************************************************************************
         // mise à zéro
